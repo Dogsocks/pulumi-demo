@@ -2,8 +2,6 @@ import pulumi
 import pulumi_docker as docker
 import pulumi_aws as aws
 import pulumi_awsx as awsx
-import pulumi_kubernetes as k8s
-import pulumi_eks as eks
 
 
 # Fetch the Docker Hub auth info from config.
