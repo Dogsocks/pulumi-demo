@@ -1,6 +1,10 @@
 import pulumi
 import pulumi_docker as docker
+import pulumi_aws as aws
+import pulumi_awsx as awsx
 import pulumi_kubernetes as k8s
+import pulumi_eks as eks
+
 
 # Fetch the Docker Hub auth info from config.
 config = pulumi.Config()
@@ -30,29 +34,30 @@ pulumi.export('baseImageName', image.base_image_name)
 pulumi.export('fullImageName', image.image_name)
 
 
-# Create a load balanced Kubernetes service using this image, and export its IP.
-app_labels = { 'app': 'myapp' }
-app_dep = k8s.apps.v1.Deployment('app-dep',
-    spec={
-        'selector': { 'matchLabels': app_labels },
-        'replicas': 3,
-        'template': {
-            'metadata': { 'labels': app_labels },
-            'spec': {
-                'containers': [{
-                    'name': 'myapp',
-                    'image': image.image_name,
-                }],
-            },
-        },
-    },
-)
-app_svc = k8s.core.v1.Service('app-svc',
-    metadata={ 'labels': app_labels },
-    spec={
-        'type': 'LoadBalancer',
-        'ports': [{ 'port': 80, 'targetPort': 80, 'protocol': 'TCP' }],
-        'selector': app_labels,
-    }
-)
-pulumi.export('appIp', app_svc.status.apply(lambda s: s.loadbalancer.ingress[0].ip))
+repo = awsx.ecr.Repository("my-repo")
+
+image = awsx.ecr.Image("image",
+                       repository_url=repo.url,
+                       path="./src/web/")
+
+
+cluster = aws.ecs.Cluster("default-cluster")
+
+lb = awsx.lb.ApplicationLoadBalancer("nginx-lb")
+
+service = awsx.ecs.FargateService("service",
+                                  cluster=cluster.arn,
+                                  task_definition_args=awsx.ecs.FargateServiceTaskDefinitionArgs(
+                                      containers={
+                                          "nginx": awsx.ecs.TaskDefinitionContainerDefinitionArgs(
+                                              image=image.image_uri,
+                                              memory=128,
+                                              port_mappings=[awsx.ecs.TaskDefinitionPortMappingArgs(
+                                                  container_port=80,
+                                                  target_group=lb.default_target_group,
+                                              )]
+                                          )
+                                      }
+                                  ))
+
+pulumi.export("url", lb.load_balancer.dns_name)
