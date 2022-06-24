@@ -32,13 +32,6 @@ pulumi.export('baseImageName', image.base_image_name)
 pulumi.export('fullImageName', image.image_name)
 
 
-repo = awsx.ecr.Repository("my-repo")
-
-image = awsx.ecr.Image("image",
-                       repository_url=repo.url,
-                       path="./src/web/")
-
-
 cluster = aws.ecs.Cluster("default-cluster")
 
 lb = awsx.lb.ApplicationLoadBalancer("nginx-lb")
@@ -48,7 +41,7 @@ service = awsx.ecs.FargateService("service",
                                   task_definition_args=awsx.ecs.FargateServiceTaskDefinitionArgs(
                                       containers={
                                           "nginx": awsx.ecs.TaskDefinitionContainerDefinitionArgs(
-                                              image=image.image_uri,
+                                              image=image.image_name,
                                               memory=128,
                                               port_mappings=[awsx.ecs.TaskDefinitionPortMappingArgs(
                                                   container_port=80,
